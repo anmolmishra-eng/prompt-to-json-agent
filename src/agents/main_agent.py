@@ -46,20 +46,9 @@ class MainAgent:
         if not prompt or len(prompt.strip()) < 3:
             raise ValueError("Prompt must be at least 3 characters long")
 
-        try:
-            # Use standardized LM Adapter interface (Day 1 requirement)
-            spec_data = self.lm_adapter.run(prompt, params={"use_llm": use_llm})
-            return self._convert_lm_output_to_spec(spec_data)
-        except Exception as e:
-            print(f"[WARNING] LM Adapter failed: {e}, using fallback")
-            # Fallback to legacy extractors
-            try:
-                if use_universal:
-                    return self._generate_with_universal_rules(prompt)
-                else:
-                    return self._convert_to_universal(self._generate_with_rules(prompt))
-            except Exception as fallback_error:
-                raise RuntimeError(f"Failed to generate specification: {str(fallback_error)}")
+        # Always use standardized LM Adapter interface (Day 1 requirement)
+        spec_data = self.lm_adapter.run(prompt, params={"use_llm": use_llm})
+        return self._convert_lm_output_to_spec(spec_data)
 
     def _generate_with_llm(self, prompt: str) -> DesignSpec:
         """Generate specs using LLM processing"""
