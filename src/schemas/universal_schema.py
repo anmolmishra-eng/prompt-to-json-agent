@@ -27,7 +27,7 @@ class PerformanceSpec(BaseModel):
     other_specs: Dict[str, Any] = Field(default_factory=dict, description="Other performance metrics")
 
 class DesignObject(BaseModel):
-    object_id: str = Field(default_factory=lambda: f"obj_{uuid.uuid4().hex[:8]}", description="Unique object identifier")
+    object_id: str = Field(description="Unique object identifier (e.g., floor_1, sofa_1, chair_2)")
     type: str = Field(description="Object type (floor, wall, chair, etc.)")
     material: str = Field(description="Primary material")
     dimensions: DimensionSpec = Field(default_factory=DimensionSpec, description="Object dimensions")
