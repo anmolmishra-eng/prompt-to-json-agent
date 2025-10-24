@@ -102,25 +102,37 @@ class FallbackDB:
     def save_compliance_feedback(self, *args): return "fallback_id"
     def save_pipeline_result(self, *args): return "fallback_id"
 
-# Import secret manager for production-grade secret handling
+# ✅ NEW WAY (using Secret Manager)
+logger = logging.getLogger(__name__)
+
 try:
     import sys
     import os
     config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'config')
     if config_path not in sys.path:
         sys.path.insert(0, config_path)
-    from config.secret_manager import get_secret, get_provider
+    from config.secret_manager import get_secret
     
-    # Load secrets from secret manager
     API_KEY = get_secret("API_KEY")
-    JWT_SECRET = get_secret("JWT_SECRET")
+    JWT_SECRET = get_secret("JWT_SECRET_KEY")
+    SUPABASE_URL = get_secret("SUPABASE_URL")
+    SUPABASE_KEY = get_secret("SUPABASE_KEY")
+    YOTTA_API_KEY = get_secret("YOTTA_API_KEY")
+    BHIV_BUCKET_ACCESS_KEY = get_secret("BHIV_BUCKET_ACCESS_KEY")
+    BHIV_BUCKET_SECRET_KEY = get_secret("BHIV_BUCKET_SECRET_KEY")
     DATABASE_URL = get_secret("DATABASE_URL")
     
-    print(f"✅ Secrets loaded from: {get_provider()}")
+    logger.info("All secrets loaded successfully from Key Vault")
 except Exception as e:
-    print(f"⚠️ Secret manager unavailable, using ENV fallback: {e}")
-    API_KEY = os.getenv("API_KEY", "test-api-key")
-    JWT_SECRET = os.getenv("JWT_SECRET", "test-jwt-secret")
+    logger.error(f"Failed to load secrets: {e}")
+    logger.warning("Falling back to environment variables (NOT PRODUCTION SAFE)")
+    API_KEY = os.getenv("API_KEY", "dev-key")
+    JWT_SECRET = os.getenv("JWT_SECRET_KEY", "dev-secret")
+    SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+    SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
+    YOTTA_API_KEY = os.getenv("YOTTA_API_KEY", "")
+    BHIV_BUCKET_ACCESS_KEY = os.getenv("BHIV_BUCKET_ACCESS_KEY", "")
+    BHIV_BUCKET_SECRET_KEY = os.getenv("BHIV_BUCKET_SECRET_KEY", "")
     DATABASE_URL = os.getenv("DATABASE_URL", "")
 
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
