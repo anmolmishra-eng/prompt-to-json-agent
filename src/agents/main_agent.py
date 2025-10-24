@@ -413,7 +413,7 @@ class MainAgent:
         
         return UniversalDesignSpec(
             design_type=spec_data.get("design_type", "general"),
-            category=spec_data.get("category", "standard"),
+            category=spec_data.get("category"),  # Use actual LM output, no default
             materials=materials,
             dimensions=dimensions,
             features=spec_data.get("features", []),
