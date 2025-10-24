@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import SQLAlchemyError
-from .models import Base, Spec, Eval, FeedbackLog, HidgLog
+from .models import Base, Spec, Eval, FeedbackLog, HidgLog, Iteration
 from .iteration_models import IterationLog
 import json
 from typing import Dict, Any, Optional, List
@@ -396,21 +396,43 @@ class Database:
 
         return iteration_id
     
-    async def save_iteration(self, spec_id: str, before_spec: Dict[Any, Any], after_spec: Dict[Any, Any], feedback: str) -> str:
-        """Save iteration for switch operations"""
+    def save_iteration(self, spec_id: str, before_spec: Dict[Any, Any], after_spec: Dict[Any, Any], feedback: str = None) -> str:
+        """Save iteration for switch operations (Day 2 Requirement)"""
         try:
             with self.get_session() as session:
-                # Use raw SQL for iterations table
-                result = session.execute(
-                    "INSERT INTO iterations (spec_id, before_spec, after_spec, feedback) VALUES (:spec_id, :before_spec, :after_spec, :feedback) RETURNING iter_id",
-                    {"spec_id": spec_id, "before_spec": json.dumps(before_spec), "after_spec": json.dumps(after_spec), "feedback": feedback}
+                iteration = Iteration(
+                    spec_id=spec_id,
+                    before_spec=before_spec,
+                    after_spec=after_spec,
+                    feedback=feedback
                 )
-                iter_id = result.fetchone()[0]
+                session.add(iteration)
                 session.commit()
-                return str(iter_id)
+                print(f"[DB] Iteration saved with ID: {iteration.iter_id}")
+                return iteration.iter_id
         except Exception as e:
             print(f"DB iteration save failed: {e}")
-            return self._fallback_save_iteration_simple(spec_id, before_spec, after_spec, feedback)
+            return self._fallback_save_iteration_simple(spec_id, before_spec, after_spec, feedback or "")
+    
+    def get_iterations(self, spec_id: str) -> List[Dict[Any, Any]]:
+        """Get all iterations for a spec (Day 2 Requirement)"""
+        try:
+            with self.get_session() as session:
+                iterations = session.query(Iteration).filter(
+                    Iteration.spec_id == spec_id
+                ).order_by(Iteration.ts).all()
+                
+                return [{
+                    'iter_id': it.iter_id,
+                    'spec_id': it.spec_id,
+                    'before_spec': it.before_spec,
+                    'after_spec': it.after_spec,
+                    'feedback': it.feedback,
+                    'ts': it.ts.isoformat()
+                } for it in iterations]
+        except Exception as e:
+            print(f"DB query failed: {e}")
+            return []
     
     async def get_spec(self, spec_id: str) -> Optional[Dict[Any, Any]]:
         """Get specification by ID (async version)"""

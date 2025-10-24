@@ -48,3 +48,14 @@ class HidgLog(Base):
     achievements = Column(JSON, nullable=True)
     technical_notes = Column(JSON, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
+
+class Iteration(Base):
+    """Iterations table for tracking before/after specs (Day 2 Requirement)"""
+    __tablename__ = 'iterations'
+
+    iter_id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    spec_id = Column(String, nullable=False)  # References specs table
+    before_spec = Column(JSON, nullable=True)  # Spec before change
+    after_spec = Column(JSON, nullable=False)  # Spec after change
+    feedback = Column(Text, nullable=True)  # Feedback/reason for change
+    ts = Column(DateTime, server_default=func.now())  # Timestamp
