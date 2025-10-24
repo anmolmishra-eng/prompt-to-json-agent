@@ -1,9 +1,12 @@
 from src.schemas.legacy_schema import DesignSpec, EvaluationResult
 from src.evaluator.criteria import EvaluationCriteria
 from src.evaluator.report import ReportGenerator
+from src.core.lm_adapter import LocalLMAdapter
 
 class EvaluatorAgent:
     def __init__(self):
+        # Standardized LM Adapter interface (Day 1 requirement)
+        self.lm_adapter = LocalLMAdapter()
         self.criteria = EvaluationCriteria()
         self.report_generator = ReportGenerator()
 

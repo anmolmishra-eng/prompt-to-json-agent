@@ -5,13 +5,17 @@ from pathlib import Path
 from datetime import datetime
 from src.schemas.legacy_schema import DesignSpec, MaterialSpec, DimensionSpec
 from src.schemas.universal_schema import UniversalDesignSpec
+from src.core.lm_adapter import LocalLMAdapter
 from src.prompt_agent.extractor import PromptExtractor
 from src.prompt_agent.universal_extractor import UniversalPromptExtractor
 
 class MainAgent:
     def __init__(self):
-        self.extractor = PromptExtractor()  # Keep for backward compatibility
-        self.universal_extractor = UniversalPromptExtractor()  # New universal extractor
+        # Standardized LM Adapter interface (Day 1 requirement)
+        self.lm_adapter = LocalLMAdapter()
+        # Keep legacy extractors for backward compatibility
+        self.extractor = PromptExtractor()
+        self.universal_extractor = UniversalPromptExtractor()
         self.spec_outputs_dir = Path("spec_outputs")
         self.spec_outputs_dir.mkdir(exist_ok=True)
 
@@ -38,24 +42,24 @@ class MainAgent:
         return spec
 
     def generate_spec(self, prompt: str, use_llm: bool = False, use_universal: bool = True) -> UniversalDesignSpec:
-        """Generate design specification with LLM integration"""
+        """Generate design specification using standardized LM Adapter interface"""
         if not prompt or len(prompt.strip()) < 3:
             raise ValueError("Prompt must be at least 3 characters long")
 
-        # Try LLM generation if API key available
-        if os.getenv("OPENAI_API_KEY") and use_llm:
-            try:
-                return self._generate_with_llm(prompt)
-            except Exception as e:
-                print(f"[WARNING] LLM generation failed: {e}, using rule-based")
-
         try:
-            if use_universal:
-                return self._generate_with_universal_rules(prompt)
-            else:
-                return self._convert_to_universal(self._generate_with_rules(prompt))
+            # Use standardized LM Adapter interface (Day 1 requirement)
+            spec_data = self.lm_adapter.run(prompt, params={"use_llm": use_llm})
+            return self._convert_lm_output_to_spec(spec_data)
         except Exception as e:
-            raise RuntimeError(f"Failed to generate specification: {str(e)}")
+            print(f"[WARNING] LM Adapter failed: {e}, using fallback")
+            # Fallback to legacy extractors
+            try:
+                if use_universal:
+                    return self._generate_with_universal_rules(prompt)
+                else:
+                    return self._convert_to_universal(self._generate_with_rules(prompt))
+            except Exception as fallback_error:
+                raise RuntimeError(f"Failed to generate specification: {str(fallback_error)}")
 
     def _generate_with_llm(self, prompt: str) -> DesignSpec:
         """Generate specs using LLM processing"""
@@ -385,6 +389,38 @@ class MainAgent:
             components=["structure", "foundation"] if old_spec.building_type != "general" else []
         )
 
+    def _convert_lm_output_to_spec(self, spec_data: dict) -> UniversalDesignSpec:
+        """Convert LM Adapter output to UniversalDesignSpec"""
+        from src.schemas.universal_schema import MaterialSpec as UniversalMaterialSpec, DimensionSpec as UniversalDimensionSpec
+        
+        # Convert materials
+        materials = []
+        for mat in spec_data.get("materials", []):
+            if isinstance(mat, dict):
+                materials.append(UniversalMaterialSpec(**mat))
+            else:
+                materials.append(UniversalMaterialSpec(type=str(mat)))
+        
+        # Convert dimensions
+        dim_data = spec_data.get("dimensions", {})
+        dimensions = UniversalDimensionSpec(
+            length=dim_data.get("length"),
+            width=dim_data.get("width"),
+            height=dim_data.get("height"),
+            area=dim_data.get("area"),
+            units=dim_data.get("units", "metric")
+        )
+        
+        return UniversalDesignSpec(
+            design_type=spec_data.get("design_type", "general"),
+            category=spec_data.get("category", "standard"),
+            materials=materials,
+            dimensions=dimensions,
+            features=spec_data.get("features", []),
+            requirements=spec_data.get("requirements", []),
+            components=spec_data.get("components", [])
+        )
+    
     def _create_fallback_spec(self, prompt: str) -> UniversalDesignSpec:
         """Create a basic fallback specification"""
         from src.schemas.universal_schema import MaterialSpec as UniversalMaterialSpec, DimensionSpec as UniversalDimensionSpec

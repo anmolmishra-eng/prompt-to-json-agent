@@ -3,9 +3,12 @@
 import os
 from typing import Dict, Any, List, Optional
 from src.schemas.legacy_schema import DesignSpec, EvaluationResult
+from src.core.lm_adapter import LocalLMAdapter
 
 class FeedbackAgent:
     def __init__(self):
+        # Standardized LM Adapter interface (Day 1 requirement)
+        self.lm_adapter = LocalLMAdapter()
         self.openai_api_key = os.getenv('OPENAI_API_KEY')
         self.use_llm = bool(self.openai_api_key)
 

@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 from src.schemas.legacy_schema import DesignSpec
+from src.core.lm_adapter import LocalLMAdapter
 
 class RLLoop:
     def __init__(self, max_iterations: int = 3, binary_rewards: bool = False):
@@ -8,6 +9,8 @@ class RLLoop:
         from src.evaluator import EvaluatorAgent
         from src.feedback import FeedbackLoop
 
+        # Standardized LM Adapter interface (Day 1 requirement)
+        self.lm_adapter = LocalLMAdapter()
         self.main_agent = MainAgent()
         self.evaluator_agent = EvaluatorAgent()
         self.feedback_loop = FeedbackLoop()
