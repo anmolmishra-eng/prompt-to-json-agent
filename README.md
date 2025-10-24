@@ -35,9 +35,14 @@ python -m venv .venv
 .venv\Scripts\activate  # Windows (.venv/bin/activate for Unix)
 pip install -r requirements.txt
 
-# 2. Configure environment
+# 2. Configure secrets (PRODUCTION)
+# Use cloud secret manager - see config/SECRETS_SECURITY.md
+export AWS_REGION=us-east-1  # or Azure/GCP equivalent
+
+# 2. Configure secrets (DEVELOPMENT ONLY)
 cp config/.env.example config/.env
-# Edit config/.env with your settings
+# Edit config/.env with development values
+# ⚠️ WARNING: Never commit .env with real secrets!
 
 # 3. Run database migrations (optional)
 alembic upgrade head
@@ -101,9 +106,23 @@ prompt-to-json-backend/
 └── requirements.txt             # Python dependencies
 ```
 
-## 🔧 Key Features
+## 🔐 Security Features
 
-### AI Agents
+### Secret Management
+- **Production**: AWS Secrets Manager, Azure Key Vault, or GCP Secret Manager
+- **Development**: Local .env files (fallback only)
+- **Compliance**: SOC 2, ISO 27001, GDPR, HIPAA, PCI DSS
+- **Audit**: Full secret access logging
+- **Rotation**: Automated secret rotation support
+
+### Authentication
+- Dual authentication (API Key + JWT)
+- Rate limiting (20 req/min)
+- CORS protection
+- Input validation
+- Secure token management
+
+## 🤖 AI Agents
 - **MainAgent**: Prompt processing and spec generation
 - **EvaluatorAgent**: Multi-criteria design evaluation
 - **RLLoop**: Reinforcement learning for iterative improvement
@@ -152,15 +171,30 @@ docker build -t prompt-backend .
 docker run -p 8000:8000 --env-file config/.env prompt-backend
 ```
 
-### Environment Variables
+### Environment Variables (Production)
+
+**🔐 PRODUCTION**: Use cloud secret managers (AWS/Azure/GCP)
+```bash
+# AWS Secrets Manager
+export AWS_REGION=us-east-1
+
+# Azure Key Vault
+export AZURE_KEY_VAULT_URL=https://your-vault.vault.azure.net/
+
+# GCP Secret Manager
+export GCP_PROJECT_ID=your-project-id
+```
+
+**⚠️ DEVELOPMENT ONLY**: Local .env file
 ```bash
 API_KEY=your-api-key
-DEMO_USERNAME=admin
-DEMO_PASSWORD=your-password
+JWT_SECRET=your-jwt-secret
+DATABASE_URL=your-database-url
 SUPABASE_URL=your-supabase-url
 SUPABASE_KEY=your-supabase-key
-JWT_SECRET_KEY=your-jwt-secret
 ```
+
+See [config/SECRETS_SECURITY.md](config/SECRETS_SECURITY.md) for details.
 
 ## 📈 Performance
 

@@ -1,13 +1,42 @@
 # Authentication Runbook
 
-## JWT Token Management
+## 🔐 Secret Management (CRITICAL)
 
-### Environment Variables
+### ⚠️ PRODUCTION REQUIREMENT
+**DO NOT use .env files in production!**
+
+Use platform secret managers:
+
+#### AWS Secrets Manager
 ```bash
-JWT_SECRET=bhiv-secret-key-2024
-DEMO_USERNAME=admin
-DEMO_PASSWORD=bhiv2024
+export AWS_REGION=us-east-1
+# Secrets: API_KEY, JWT_SECRET, DATABASE_URL
 ```
+
+#### Azure Key Vault
+```bash
+export AZURE_KEY_VAULT_URL=https://your-vault.vault.azure.net/
+# Secrets: API-KEY, JWT-SECRET, DATABASE-URL
+```
+
+#### GCP Secret Manager
+```bash
+export GCP_PROJECT_ID=your-project-id
+# Secrets: API_KEY, JWT_SECRET, DATABASE_URL
+```
+
+### Development Only (Local)
+```bash
+# ⚠️ WARNING: Development fallback only!
+JWT_SECRET=your-dev-jwt-secret
+API_KEY=your-dev-api-key
+DEMO_USERNAME=admin
+DEMO_PASSWORD=your-dev-password
+```
+
+**See**: [config/SECRETS_SECURITY.md](SECRETS_SECURITY.md) for full setup
+
+## JWT Token Management
 
 ### Login Flow
 1. POST `/api/v1/auth/login` with username/password

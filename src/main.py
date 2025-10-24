@@ -102,7 +102,27 @@ class FallbackDB:
     def save_compliance_feedback(self, *args): return "fallback_id"
     def save_pipeline_result(self, *args): return "fallback_id"
 
-API_KEY = os.getenv("API_KEY", "test-api-key")
+# Import secret manager for production-grade secret handling
+try:
+    import sys
+    import os
+    config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'config')
+    if config_path not in sys.path:
+        sys.path.insert(0, config_path)
+    from config.secret_manager import get_secret, get_provider
+    
+    # Load secrets from secret manager
+    API_KEY = get_secret("API_KEY")
+    JWT_SECRET = get_secret("JWT_SECRET")
+    DATABASE_URL = get_secret("DATABASE_URL")
+    
+    print(f"✅ Secrets loaded from: {get_provider()}")
+except Exception as e:
+    print(f"⚠️ Secret manager unavailable, using ENV fallback: {e}")
+    API_KEY = os.getenv("API_KEY", "test-api-key")
+    JWT_SECRET = os.getenv("JWT_SECRET", "test-jwt-secret")
+    DATABASE_URL = os.getenv("DATABASE_URL", "")
+
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 bearer_scheme = HTTPBearer(auto_error=False)
 
