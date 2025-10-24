@@ -61,10 +61,20 @@ class LocalLMAdapter(LMAdapter):
         return 'general'
     
     def _extract_category(self, prompt: str, design_type: str) -> str:
+        prompt_lower = prompt.lower()
         if design_type == 'building':
-            return 'residential' if 'house' in prompt.lower() else 'commercial'
+            # Check for residential keywords
+            if any(word in prompt_lower for word in ['house', 'home', 'residential', 'apartment', 'condo', 'villa']):
+                return 'residential'
+            # Check for commercial keywords
+            elif any(word in prompt_lower for word in ['office', 'commercial', 'retail', 'shop']):
+                return 'commercial'
+            # Check for industrial keywords
+            elif any(word in prompt_lower for word in ['warehouse', 'factory', 'industrial']):
+                return 'industrial'
+            return 'commercial'  # Default for buildings
         elif design_type == 'vehicle':
-            return 'electric' if 'electric' in prompt.lower() else 'standard'
+            return 'electric' if 'electric' in prompt_lower else 'standard'
         return 'standard'
     
     def _extract_materials(self, prompt: str) -> list:
