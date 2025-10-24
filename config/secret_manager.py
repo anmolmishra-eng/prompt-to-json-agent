@@ -1,134 +1,118 @@
 """
-Production Secret Manager - Multi-Cloud Support
-Supports: AWS Secrets Manager, Azure Key Vault, GCP Secret Manager
-Fallback: Environment variables (dev only)
+Secret Manager - Azure Key Vault Implementation
+Replace .env files with secure secret management
 """
 import os
+from typing import Optional
+from azure.keyvault.secrets import SecretClient
+from azure.identity import DefaultAzureCredential
+from functools import lru_cache
 import logging
-from typing import Optional, Dict
-from enum import Enum
 
 logger = logging.getLogger(__name__)
 
-class SecretProvider(Enum):
-    AWS = "aws"
-    AZURE = "azure"
-    GCP = "gcp"
-    ENV = "env"  # Development fallback only
-
 class SecretManager:
+    """Secure secret management using Azure Key Vault"""
+    
     def __init__(self):
-        self.provider = self._detect_provider()
-        self._client = None
-        self._cache: Dict[str, str] = {}
+        self.vault_url = os.getenv(
+            "AZURE_KEY_VAULT_URL",
+            "https://your-keyvault-name.vault.azure.net/"
+        )
         
-    def _detect_provider(self) -> SecretProvider:
-        """Auto-detect cloud provider from environment"""
-        if os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION"):
-            return SecretProvider.AWS
-        elif os.getenv("AZURE_KEY_VAULT_URL"):
-            return SecretProvider.AZURE
-        elif os.getenv("GCP_PROJECT_ID"):
-            return SecretProvider.GCP
-        else:
-            logger.warning("⚠️ No cloud provider detected. Using ENV fallback (NOT for production)")
-            return SecretProvider.ENV
-    
-    def get_secret(self, secret_name: str) -> str:
-        """Fetch secret from configured provider"""
-        if secret_name in self._cache:
-            return self._cache[secret_name]
-        
-        if self.provider == SecretProvider.AWS:
-            value = self._get_aws_secret(secret_name)
-        elif self.provider == SecretProvider.AZURE:
-            value = self._get_azure_secret(secret_name)
-        elif self.provider == SecretProvider.GCP:
-            value = self._get_gcp_secret(secret_name)
-        else:
-            value = self._get_env_secret(secret_name)
-        
-        if value:
-            self._cache[secret_name] = value
-        return value
-    
-    def _get_aws_secret(self, secret_name: str) -> str:
-        """Fetch from AWS Secrets Manager"""
         try:
-            import boto3
-            from botocore.exceptions import ClientError
-            
-            if not self._client:
-                region = os.getenv("AWS_REGION", "us-east-1")
-                self._client = boto3.client("secretsmanager", region_name=region)
-            
-            response = self._client.get_secret_value(SecretId=secret_name)
-            logger.info(f"✅ Retrieved secret '{secret_name}' from AWS Secrets Manager")
-            return response["SecretString"]
-        except ImportError:
-            logger.error("❌ boto3 not installed. Run: pip install boto3")
-            return self._get_env_secret(secret_name)
-        except ClientError as e:
-            logger.error(f"❌ AWS Secrets Manager error: {e}")
-            return self._get_env_secret(secret_name)
+            # Use DefaultAzureCredential for automatic auth
+            # (works with managed identity in production)
+            credential = DefaultAzureCredential()
+            self.client = SecretClient(
+                vault_url=self.vault_url,
+                credential=credential
+            )
+            logger.info("Secret Manager initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize Secret Manager: {e}")
+            raise
     
-    def _get_azure_secret(self, secret_name: str) -> str:
-        """Fetch from Azure Key Vault"""
+    @lru_cache(maxsize=50)
+    def get_secret(self, secret_name: str, default: Optional[str] = None) -> str:
+        """
+        Retrieve secret from Key Vault with caching
+        
+        Args:
+            secret_name: Name of the secret in Key Vault
+            default: Default value if secret not found
+            
+        Returns:
+            Secret value as string
+        """
         try:
-            from azure.keyvault.secrets import SecretClient
-            from azure.identity import DefaultAzureCredential
-            
-            if not self._client:
-                vault_url = os.getenv("AZURE_KEY_VAULT_URL")
-                credential = DefaultAzureCredential()
-                self._client = SecretClient(vault_url=vault_url, credential=credential)
-            
-            secret = self._client.get_secret(secret_name)
-            logger.info(f"✅ Retrieved secret '{secret_name}' from Azure Key Vault")
+            secret = self.client.get_secret(secret_name)
+            logger.info(f"Successfully retrieved secret: {secret_name}")
             return secret.value
-        except ImportError:
-            logger.error("❌ Azure SDK not installed. Run: pip install azure-keyvault-secrets azure-identity")
-            return self._get_env_secret(secret_name)
         except Exception as e:
-            logger.error(f"❌ Azure Key Vault error: {e}")
-            return self._get_env_secret(secret_name)
+            logger.warning(f"Failed to get secret {secret_name}: {e}")
+            if default is not None:
+                logger.info(f"Using default value for {secret_name}")
+                return default
+            raise
     
-    def _get_gcp_secret(self, secret_name: str) -> str:
-        """Fetch from GCP Secret Manager"""
+    def set_secret(self, secret_name: str, secret_value: str) -> None:
+        """
+        Store a secret in Key Vault
+        
+        Args:
+            secret_name: Name of the secret
+            secret_value: Value to store
+        """
         try:
-            from google.cloud import secretmanager
-            
-            if not self._client:
-                self._client = secretmanager.SecretManagerServiceClient()
-            
-            project_id = os.getenv("GCP_PROJECT_ID")
-            name = f"projects/{project_id}/secrets/{secret_name}/versions/latest"
-            response = self._client.access_secret_version(request={"name": name})
-            logger.info(f"✅ Retrieved secret '{secret_name}' from GCP Secret Manager")
-            return response.payload.data.decode("UTF-8")
-        except ImportError:
-            logger.error("❌ GCP SDK not installed. Run: pip install google-cloud-secret-manager")
-            return self._get_env_secret(secret_name)
+            self.client.set_secret(secret_name, secret_value)
+            logger.info(f"Successfully stored secret: {secret_name}")
+            # Clear cache for this secret
+            self.get_secret.cache_clear()
         except Exception as e:
-            logger.error(f"❌ GCP Secret Manager error: {e}")
-            return self._get_env_secret(secret_name)
+            logger.error(f"Failed to set secret {secret_name}: {e}")
+            raise
+
+# Global instance
+secret_manager = SecretManager()
+
+# Convenience function
+def get_secret(name: str, default: Optional[str] = None) -> str:
+    """Get secret from Key Vault"""
+    return secret_manager.get_secret(name, default)
+
+
+# ========== AWS SECRETS MANAGER VERSION ==========
+"""
+import boto3
+from botocore.exceptions import ClientError
+import json
+
+class AWSSecretManager:
+    def __init__(self, region_name: str = "us-east-1"):
+        self.client = boto3.client(
+            service_name='secretsmanager',
+            region_name=region_name
+        )
     
-    def _get_env_secret(self, secret_name: str) -> str:
-        """Fallback to environment variables (dev only)"""
-        value = os.getenv(secret_name)
-        if value:
-            logger.warning(f"⚠️ Using ENV fallback for '{secret_name}' - NOT PRODUCTION SAFE")
-        else:
-            logger.error(f"❌ Secret '{secret_name}' not found in any provider")
-        return value or ""
-
-# Global singleton instance
-_secret_manager = SecretManager()
-
-def get_secret(secret_name: str) -> str:
-    """Public API to fetch secrets"""
-    return _secret_manager.get_secret(secret_name)
-
-def get_provider() -> str:
-    """Get current provider name"""
-    return _secret_manager.provider.value
+    @lru_cache(maxsize=50)
+    def get_secret(self, secret_name: str, default: Optional[str] = None) -> str:
+        try:
+            response = self.client.get_secret_value(SecretId=secret_name)
+            
+            # Handle both string and JSON secrets
+            if 'SecretString' in response:
+                secret = response['SecretString']
+                try:
+                    return json.loads(secret)
+                except json.JSONDecodeError:
+                    return secret
+            else:
+                return base64.b64decode(response['SecretBinary'])
+                
+        except ClientError as e:
+            logger.warning(f"Failed to get secret {secret_name}: {e}")
+            if default is not None:
+                return default
+            raise
+"""
