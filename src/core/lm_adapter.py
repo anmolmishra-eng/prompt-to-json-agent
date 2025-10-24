@@ -48,7 +48,7 @@ class LocalLMAdapter(LMAdapter):
     
     def _detect_design_type(self, prompt: str) -> str:
         prompt_lower = prompt.lower()
-        if any(word in prompt_lower for word in ['building', 'house', 'office', 'structure']):
+        if any(word in prompt_lower for word in ['building', 'house', 'office', 'structure', 'apartment', 'residential', 'condo', 'villa', 'warehouse', 'hospital']):
             return 'building'
         elif any(word in prompt_lower for word in ['car', 'vehicle', 'truck', 'bike']):
             return 'vehicle'
